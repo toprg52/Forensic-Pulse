@@ -2,9 +2,8 @@
 
 > AML & Money Muling Ring Detection powered by **NetworkX**, **FastAPI**, **React 18**, and **Cytoscape.js**
 
-> [!abstract]
-> 🔗 **Live Demo:**
-> 🔗 **Live Website:** 
+🔗 **Live Demo:**
+🔗 **Live Website:** 
 
 ---
 
