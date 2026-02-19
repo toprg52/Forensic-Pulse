@@ -1,0 +1,32 @@
+@theme {
+  --font-sans: 'Inter', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+
+  --color-bg-canvas: #F5F4F0;
+  --color-bg-panel: #FFFFFF;
+  --color-bg-raised: #F9F8F5;
+  --color-bg-overlay: rgba(28, 28, 30, 0.6);
+
+  --color-border-subtle: #E8E6DF;
+  --color-border-medium: #D1CEC5;
+  --color-border-strong: #1C1C1E;
+
+  --color-text-primary: #1C1C1E;
+  --color-text-secondary: #6B6967;
+  --color-text-muted: #9C9894;
+
+  --color-risk-critical: #B91C1C;
+  --color-risk-high: #C2410C;
+  --color-risk-medium: #B45309;
+  --color-risk-low: #4B5563;
+  --color-risk-safe: #166534;
+
+  --color-accent: #1D4ED8;
+}
+
+body {
+  background-color: var(--color-bg-canvas);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
