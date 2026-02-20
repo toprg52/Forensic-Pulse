@@ -149,8 +149,8 @@ def detect_smurfing(
 ) -> List[Dict]:
     """
     Identify real smurfing hubs — nodes that:
-      1. Receive from 10+ unique senders within a 72-hour window (fan-in burst)
-      2. ALSO send money OUT within 72 hours of that inbound cluster (re-dispersal)
+      1. Receive from 3+ unique senders within a 168-hour window (fan-in burst)
+      2. ALSO send money OUT within 168 hours of that inbound cluster (re-dispersal)
 
     FIX: Pure receivers (MRC_ merchants, etc.) are silently skipped because they
     fail GATE 3 (zero outbound transactions).  Payroll and merchant traps are
@@ -159,8 +159,8 @@ def detect_smurfing(
     Optimised: O(n) two-pointer sliding-window burst detection.
     """
     rings: List[Dict]  = []
-    WINDOW_SECONDS     = 72 * 3600       # 72-hour clustering window
-    CLUSTER_PCT        = 0.70            # ≥70% of deposits must fall in window
+    WINDOW_SECONDS     = 168 * 3600      # 168-hour (1-week) clustering window
+    CLUSTER_PCT        = 0.50            # ≥50% of deposits must fall in window
     ring_counter       = [0]
 
     df_t = df.copy()
@@ -236,7 +236,7 @@ def detect_smurfing(
         out_deg = G.out_degree(node)
 
         # ── GATE 1: minimum fan-in to even consider ────────────────────────────
-        if in_deg < 10 and out_deg < 10:
+        if in_deg < 3 and out_deg < 3:
             continue
 
         # ── GATE 2: skip demoted accounts (merchants, payroll) ─────────────────
@@ -244,7 +244,7 @@ def detect_smurfing(
             continue
 
         # ── Fan-in smurfing check ──────────────────────────────────────────────
-        if in_deg >= 10:
+        if in_deg >= 3:
             node_in_ts     = in_ts.get(node, np.array([]))
             node_out_ts    = out_ts.get(node, np.array([]))
 
@@ -256,8 +256,8 @@ def detect_smurfing(
                 burst_count, burst_lo, burst_hi = _max_burst(node_in_ts)
                 clustering_pct = burst_count / max(len(node_in_ts), 1)
 
-                # GATE 5: At least 70% of deposits in a 72-hour window
-                if clustering_pct >= CLUSTER_PCT and burst_count >= 10:
+                # GATE 5: At least 50% of deposits in a 168-hour window
+                if clustering_pct >= CLUSTER_PCT and burst_count >= 3:
 
                     # GATE 6: Outbound must occur within 72h of the cluster
                     if len(node_in_ts) > 0 and burst_hi < len(node_in_ts):
@@ -281,7 +281,7 @@ def detect_smurfing(
                                 ))
 
         # ── Fan-out smurfing check ─────────────────────────────────────────────
-        if out_deg >= 10:
+        if out_deg >= 3:
             node_out_ts = out_ts.get(node, np.array([]))
             burst_count, _, _ = _max_burst(node_out_ts)
             # Apply the same temporal clustering gate as fan-in:
@@ -289,7 +289,7 @@ def detect_smurfing(
             # PAY_ accounts send ~40 salaries spread over 6 months → low clustering.
             # Real fan-out smurfs disperse in one tight burst → high clustering.
             out_clustering_pct = burst_count / max(len(node_out_ts), 1)
-            if burst_count >= 10 and out_clustering_pct >= CLUSTER_PCT:
+            if burst_count >= 3 and out_clustering_pct >= CLUSTER_PCT:
                 receivers = [
                     r for r in out_partners.get(node, [])
                     if r not in demoted_nodes
