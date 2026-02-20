@@ -85,12 +85,18 @@ def sanitize_csv(raw: str) -> str:
 
 
 # ─────────────────────────────────────────────────────────────
-# Health Check
+# Health Check & Debug
 # ─────────────────────────────────────────────────────────────
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "Financial Forensics Engine"}
+    return {"status": "ok", "service": "Financial Forensics Engine", "version": "1.0.0"}
+
+
+@app.get("/api/health")
+def api_health():
+    """Health check for API function testing."""
+    return {"status": "ok", "service": "Financial Forensics Engine API"}
 
 
 # ─────────────────────────────────────────────────────────────
@@ -106,45 +112,52 @@ async def analyze(file: UploadFile = File(...)):
         transaction_id, sender_id, receiver_id, amount,
         timestamp (YYYY-MM-DD HH:MM:SS)
     """
-    if not file.filename.endswith(".csv"):
-        raise HTTPException(status_code=400, detail="Only CSV files are accepted.")
-
-    contents = await file.read()
-
-    # Decode – try UTF-8, fall back to latin-1 (covers Windows-1252 exports)
+    import traceback
+    
     try:
-        raw_text = contents.decode("utf-8")
-    except UnicodeDecodeError:
-        raw_text = contents.decode("latin-1")
+        if not file.filename.endswith(".csv"):
+            raise HTTPException(status_code=400, detail="Only CSV files are accepted.")
 
-    # Auto-repair common formatting issues
-    clean_text = sanitize_csv(raw_text)
+        contents = await file.read()
 
-    try:
-        df = pd.read_csv(io.StringIO(clean_text))
-    except Exception as e:
-        raise HTTPException(status_code=422, detail=f"Could not parse CSV: {e}")
+        # Decode – try UTF-8, fall back to latin-1 (covers Windows-1252 exports)
+        try:
+            raw_text = contents.decode("utf-8")
+        except UnicodeDecodeError:
+            raw_text = contents.decode("latin-1")
 
-    # Normalise column names
-    df.columns = [c.strip().lower() for c in df.columns]
+        # Auto-repair common formatting issues
+        clean_text = sanitize_csv(raw_text)
 
-    missing = REQUIRED_COLUMNS - set(df.columns)
-    if missing:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Missing required columns: {sorted(missing)}"
-        )
+        try:
+            df = pd.read_csv(io.StringIO(clean_text))
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=f"Could not parse CSV: {e}")
 
-    if len(df) == 0:
-        raise HTTPException(status_code=422, detail="CSV is empty.")
+        # Normalise column names
+        df.columns = [c.strip().lower() for c in df.columns]
 
-    try:
+        missing = REQUIRED_COLUMNS - set(df.columns)
+        if missing:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Missing required columns: {sorted(missing)}"
+            )
+
+        if len(df) == 0:
+            raise HTTPException(status_code=422, detail="CSV is empty.")
+
+        print(f"Starting analysis on {len(df)} transactions...")
         result = run_full_analysis(df)
+        print(f"Analysis complete!")
         return JSONResponse(content=result)
+        
+    except HTTPException:
+        raise
     except Exception as e:
-        import traceback
-        error_msg = f"Analysis failed: {str(e)}\n{traceback.format_exc()}"
-        print(f"ERROR: {error_msg}")  # Log to Vercel console
+        error_msg = f"Analysis failed: {str(e)}"
+        error_trace = traceback.format_exc()
+        print(f"ERROR: {error_msg}\n{error_trace}")
         raise HTTPException(status_code=500, detail=error_msg)
 
 
