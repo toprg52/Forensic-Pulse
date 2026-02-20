@@ -1,9 +1,16 @@
+import os
 import sys
-from pathlib import Path
 
-# Add backend directory to Python path
-backend_path = Path(__file__).parent.parent / "back-end" / "new-back"
-sys.path.insert(0, str(backend_path))
+# Bulletproof path resolution for Vercel's serverless environment
+possible_paths = [
+    os.path.join(os.getcwd(), 'back-end', 'new-back'),
+    os.path.join(os.path.dirname(__file__), '..', 'back-end', 'new-back'),
+    os.path.join(os.path.dirname(__file__), 'back-end', 'new-back')
+]
 
-# Import the FastAPI app instance to be served by Vercel
+for p in possible_paths:
+    if os.path.exists(p):
+        sys.path.insert(0, p)
+        break
+
 from main import app
