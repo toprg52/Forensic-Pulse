@@ -2,27 +2,15 @@
 Vercel Serverless Function for FastAPI Backend
 """
 import sys
-import os
 from pathlib import Path
 
-# Get the absolute path to the backend directory
-current_dir = Path(__file__).parent.absolute()
-backend_path = current_dir.parent / "back-end" / "new-back"
-
-# Ensure the backend directory is in the path
+# Add the backend directory to Python path for imports
+backend_path = Path(__file__).parent.parent / "back-end" / "new-back"
 sys.path.insert(0, str(backend_path))
 
-# Change to backend directory to ensure relative imports work
-os.chdir(str(backend_path))
+# Import and expose the FastAPI app for Vercel
+from main import app
 
-try:
-    from main import app
-except ImportError as e:
-    # Fallback: Try importing modules directly
-    print(f"Warning: Could not import from main.py: {e}")
-    print(f"Backend path: {backend_path}")
-    print(f"Files in backend path: {list(backend_path.glob('*.py'))}")
-    raise
+# Vercel Python serverless functions export the app directly
+# This allows Vercel to route HTTPS requests to the ASGI app
 
-# Export the FastAPI app for Vercel
-handler = app
