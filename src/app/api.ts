@@ -93,3 +93,90 @@ export async function analyzeFile(file: File): Promise<AnalysisResponse> {
 
     return response.json();
 }
+
+// ── Simulation types ──
+
+export interface SimulationCycle {
+    cycle_members: string[];
+    cycle_length: number;
+    cycle_risk_score: number;
+}
+
+export interface RingAffected {
+    ring_id: string;
+    impact_type: 'joins' | 'merges' | 'escalates';
+    old_risk_score: number;
+    new_risk_score: number;
+    delta: number;
+    description: string;
+}
+
+export interface RingMerged {
+    ring_a: string;
+    ring_b: string;
+    merged_member_count: number;
+    merged_risk_score: number;
+}
+
+export interface ScoreDelta {
+    account_id: string;
+    old_score: number;
+    new_score: number;
+    delta: number;
+    delta_reason: string;
+}
+
+export interface SimulationResult {
+    simulation_id: string;
+    hypothetical_tx: {
+        sender_id: string;
+        receiver_id: string;
+        amount: number;
+        timestamp: string;
+    };
+    verdict: 'DANGEROUS' | 'WARNING' | 'SUSPICIOUS' | 'CLEAN';
+    verdict_reason: string;
+    new_cycles_created: SimulationCycle[];
+    rings_affected: RingAffected[];
+    rings_merged: RingMerged[];
+    score_deltas: ScoreDelta[];
+    new_smurfing_triggered: boolean;
+    smurfing_account: string | null;
+    new_shell_chain_extended: boolean;
+    chain_extension_detail: string | null;
+    subgraph_delta: {
+        nodes_affected: number;
+        edges_added: number;
+        new_nodes_introduced: number;
+    };
+    processing_time_ms: number;
+}
+
+// ── Simulation API calls ──
+
+export async function simulateTransaction(
+    sender_id: string,
+    receiver_id: string,
+    amount: number,
+    timestamp?: string
+): Promise<SimulationResult> {
+    const response = await fetch('/api/simulate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sender_id, receiver_id, amount, timestamp }),
+    });
+
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({ detail: response.statusText }));
+        throw new Error(err.detail || `Simulation failed (${response.status})`);
+    }
+
+    return response.json();
+}
+
+export async function fetchAccounts(): Promise<string[]> {
+    const response = await fetch('/api/accounts');
+    if (!response.ok) return [];
+    const data = await response.json();
+    return data.accounts || [];
+}

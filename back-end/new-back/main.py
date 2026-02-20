@@ -6,13 +6,17 @@ RIFT 2026 Hackathon
 import io
 import json
 from pathlib import Path
+from datetime import datetime
+from typing import Optional
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 import pandas as pd
 
 from detection_engine import run_full_analysis
+from simulator import simulate_transaction
 
 app = FastAPI(
     title="Financial Forensics Engine",
@@ -27,6 +31,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ── Pydantic models ──
+class SimulationRequest(BaseModel):
+    sender_id: str
+    receiver_id: str
+    amount: float
+    timestamp: Optional[str] = None
+
+
+# ── App state (persists between requests) ──
+app.state.last_analysis_result = None
+app.state.last_rings = None
+app.state.last_all_nodes = set()
+
 
 REQUIRED_COLUMNS = {"transaction_id", "sender_id", "receiver_id", "amount", "timestamp"}
 
@@ -160,6 +179,15 @@ async def analyze(file: UploadFile = File(...)):
         print(f"ERROR: {error_msg}\n{error_trace}")
         raise HTTPException(status_code=500, detail=error_msg)
 
+    # Cache results for simulator
+    app.state.last_analysis_result = result
+    app.state.last_rings = result.get("fraud_rings", [])
+    app.state.last_all_nodes = set(
+        n["id"] for n in result.get("graph", {}).get("nodes", [])
+    )
+
+    return JSONResponse(content=result)
+
 
 # ─────────────────────────────────────────────────────────────
 # Sample / Demo Data Generator
@@ -231,6 +259,43 @@ def get_sample_csv():
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=sample_transactions.csv"},
     )
+
+
+# ─────────────────────────────────────────────────────────────
+# What-If Transaction Simulator
+# ─────────────────────────────────────────────────────────────
+
+@app.post("/simulate")
+async def simulate_endpoint(request: SimulationRequest):
+    """Run a what-if simulation for a hypothetical transaction."""
+    if app.state.last_analysis_result is None:
+        raise HTTPException(
+            status_code=400,
+            detail="No analysis data in memory. Upload and analyze a CSV first.",
+        )
+
+    ts = request.timestamp or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    result = simulate_transaction(
+        hypothetical_tx={
+            "sender_id": request.sender_id,
+            "receiver_id": request.receiver_id,
+            "amount": request.amount,
+            "timestamp": ts,
+        },
+        existing_analysis=app.state.last_analysis_result,
+        existing_rings=app.state.last_rings or [],
+    )
+
+    return JSONResponse(content=result)
+
+
+@app.get("/accounts")
+async def get_account_list():
+    """Return all known account IDs (for frontend autocomplete)."""
+    if not app.state.last_all_nodes:
+        return {"accounts": []}
+    return {"accounts": sorted(list(app.state.last_all_nodes))}
 
 
 # ─────────────────────────────────────────────────────────────

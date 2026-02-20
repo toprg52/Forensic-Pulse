@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import cytoscape from 'cytoscape';
 import { Account, Transaction, FraudRing } from '../data/mockData';
+import type { SimulationResult } from '../api';
 import clsx from 'clsx';
 import { Maximize2 } from 'lucide-react';
 
@@ -10,9 +11,10 @@ interface NetworkGraphProps {
   rings: FraudRing[];
   onNodeClick: (accountId: string) => void;
   selectedAccountId?: string;
+  simulationResult?: SimulationResult | null;
 }
 
-export function NetworkGraph({ accounts, transactions, rings, onNodeClick, selectedAccountId }: NetworkGraphProps) {
+export function NetworkGraph({ accounts, transactions, rings, onNodeClick, selectedAccountId, simulationResult }: NetworkGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<cytoscape.Core | null>(null);
   const [hoveredNode, setHoveredNode] = useState<{ id: string, x: number, y: number } | null>(null);
@@ -22,18 +24,18 @@ export function NetworkGraph({ accounts, transactions, rings, onNodeClick, selec
     if (!containerRef.current) return;
 
     // Filter data based on view mode
-    const activeAccounts = filterRingsOnly 
+    const activeAccounts = filterRingsOnly
       ? accounts.filter(a => a.ringId)
       : accounts;
-      
-    const activeTransactions = transactions.filter(t => 
-      activeAccounts.find(a => a.id === t.source) && 
+
+    const activeTransactions = transactions.filter(t =>
+      activeAccounts.find(a => a.id === t.source) &&
       activeAccounts.find(a => a.id === t.target)
     );
 
     const elements = [
       ...activeAccounts.map(a => ({
-        data: { 
+        data: {
           id: a.id,
           risk: a.suspicionScore,
           ringId: a.ringId,
@@ -42,15 +44,52 @@ export function NetworkGraph({ accounts, transactions, rings, onNodeClick, selec
         classes: a.ringId ? 'ring-member' : (a.suspicionScore > 50 ? 'suspicious' : 'clean')
       })),
       ...activeTransactions.map(t => ({
-        data: { 
-          id: t.id, 
-          source: t.source, 
+        data: {
+          id: t.id,
+          source: t.source,
           target: t.target,
           isFraud: t.isFraud
         },
         classes: t.isFraud ? 'fraud-edge' : 'normal-edge'
       }))
     ];
+
+    // Inject simulation overlay elements
+    if (simulationResult) {
+      const tx = simulationResult.hypothetical_tx;
+      const affectedIds = new Set(simulationResult.score_deltas.map(d => d.account_id));
+      const cycleIds = new Set(simulationResult.new_cycles_created.flatMap(c => c.cycle_members));
+
+      // Add hypothetical nodes if not already present
+      if (!activeAccounts.find(a => a.id === tx.sender_id)) {
+        elements.push({
+          data: { id: tx.sender_id, risk: 0, ringId: undefined as any, label: tx.sender_id.slice(-6) },
+          classes: 'sim-node'
+        });
+      }
+      if (!activeAccounts.find(a => a.id === tx.receiver_id)) {
+        elements.push({
+          data: { id: tx.receiver_id, risk: 0, ringId: undefined as any, label: tx.receiver_id.slice(-6) },
+          classes: 'sim-node'
+        });
+      }
+
+      // Add hypothetical edge
+      elements.push({
+        data: { id: 'SIM_EDGE', source: tx.sender_id, target: tx.receiver_id, isFraud: false },
+        classes: 'sim-edge'
+      });
+
+      // Mark affected and cycle nodes
+      for (const el of elements) {
+        if (el.data.id && affectedIds.has(el.data.id)) {
+          el.classes = (el.classes || '') + ' sim-affected';
+        }
+        if (el.data.id && cycleIds.has(el.data.id)) {
+          el.classes = (el.classes || '') + ' sim-cycle';
+        }
+      }
+    }
 
     const cy = cytoscape({
       container: containerRef.current,
@@ -125,6 +164,47 @@ export function NetworkGraph({ accounts, transactions, rings, onNodeClick, selec
             'width': 1.5,
             'opacity': 0.8
           }
+        },
+        {
+          selector: '.sim-edge',
+          style: {
+            'line-color': '#1D4ED8',
+            'target-arrow-color': '#1D4ED8',
+            'width': 2,
+            'opacity': 1,
+            'line-style': 'dashed',
+            'arrow-scale': 1.2
+          }
+        },
+        {
+          selector: '.sim-node',
+          style: {
+            'border-color': '#1D4ED8',
+            'border-width': 2,
+            'width': 18,
+            'height': 18,
+            'background-color': '#EFF6FF',
+            'color': '#1D4ED8'
+          }
+        },
+        {
+          selector: '.sim-affected',
+          style: {
+            'border-color': '#B45309',
+            'border-width': 2.5,
+            'width': 20,
+            'height': 20
+          }
+        },
+        {
+          selector: '.sim-cycle',
+          style: {
+            'border-color': '#B91C1C',
+            'border-width': 3,
+            'width': 22,
+            'height': 22,
+            'background-color': '#FEF2F2'
+          }
         }
       ],
       layout: {
@@ -169,7 +249,7 @@ export function NetworkGraph({ accounts, transactions, rings, onNodeClick, selec
     return () => {
       cy.destroy();
     };
-  }, [accounts, transactions, onNodeClick, filterRingsOnly]);
+  }, [accounts, transactions, onNodeClick, filterRingsOnly, simulationResult]);
 
   useEffect(() => {
     if (cyRef.current && selectedAccountId) {
@@ -185,24 +265,24 @@ export function NetworkGraph({ accounts, transactions, rings, onNodeClick, selec
   return (
     <div className="relative w-full h-full bg-[var(--color-bg-canvas)]">
       <div ref={containerRef} className="w-full h-full" />
-      
+
       {/* Floating Controls */}
       <div className="absolute top-4 right-4 flex bg-white rounded-md shadow-sm border border-[var(--color-border-subtle)] p-1 z-10">
-        <button 
+        <button
           className={clsx("px-3 py-1.5 text-[11px] font-medium rounded transition-colors", !filterRingsOnly ? "bg-gray-100 text-gray-900" : "text-gray-500 hover:bg-gray-50")}
           onClick={() => setFilterRingsOnly(false)}
         >
           All Nodes
         </button>
         <div className="w-[1px] bg-gray-200 mx-1 my-1" />
-        <button 
+        <button
           className={clsx("px-3 py-1.5 text-[11px] font-medium rounded transition-colors", filterRingsOnly ? "bg-red-50 text-red-700" : "text-gray-500 hover:bg-gray-50")}
           onClick={() => setFilterRingsOnly(true)}
         >
           Rings Only
         </button>
         <div className="w-[1px] bg-gray-200 mx-1 my-1" />
-        <button 
+        <button
           className="px-2 text-gray-500 hover:bg-gray-50 rounded"
           onClick={resetZoom}
           title="Reset Zoom"
@@ -237,11 +317,11 @@ export function NetworkGraph({ accounts, transactions, rings, onNodeClick, selec
 
       {/* Tooltip */}
       {hoveredNode && (
-        <div 
+        <div
           className="absolute bg-white border border-[var(--color-border-medium)] shadow-lg rounded-md p-3 z-50 w-48 pointer-events-none"
-          style={{ 
-            left: hoveredNode.x + 10, 
-            top: hoveredNode.y + 10 
+          style={{
+            left: hoveredNode.x + 10,
+            top: hoveredNode.y + 10
           }}
         >
           <div className="flex justify-between items-start mb-1">

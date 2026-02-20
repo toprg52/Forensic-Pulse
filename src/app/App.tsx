@@ -6,7 +6,8 @@ import { AccountExplorer } from './components/AccountExplorer';
 import { AccountDetailPanel } from './components/AccountDetailPanel';
 import { UploadScreen } from './components/UploadScreen';
 import { ChartsView } from './components/ChartsView';
-import type { AnalysisResponse } from './api';
+import { SimulatorPanel } from './components/SimulatorPanel';
+import type { AnalysisResponse, SimulationResult } from './api';
 import { mapApiToAccounts, mapApiToRings, mapApiToTransactions } from './data/mappers';
 
 // Error boundary for graceful error handling
@@ -57,6 +58,10 @@ function App() {
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [analysisResponse, setAnalysisResponse] = useState<AnalysisResponse | null>(null);
 
+  // Simulator state
+  const [simulatorOpen, setSimulatorOpen] = useState(false);
+  const [simulationResult, setSimulationResult] = useState<SimulationResult | null>(null);
+
   // Derive frontend data from API response
   const accounts = useMemo(
     () => analysisResponse ? mapApiToAccounts(analysisResponse) : [],
@@ -83,6 +88,8 @@ function App() {
     setCurrentView('graph');
     setSelectedAccountId(null);
     setAnalysisResponse(null);
+    setSimulationResult(null);
+    setSimulatorOpen(false);
   };
 
   const handleNodeClick = (accountId: string) => {
@@ -90,7 +97,6 @@ function App() {
   };
 
   const handleRingClick = (ringId: string) => {
-    // Switch to graph view and focus on ring
     setCurrentView('graph');
   };
 
@@ -133,9 +139,25 @@ function App() {
               setView={setCurrentView}
               metrics={sidebarMetrics}
               patterns={sidebarPatterns}
+              onOpenSimulator={() => setSimulatorOpen(true)}
             />
 
             <main className="flex-1 relative bg-[var(--color-bg-canvas)]">
+              {/* Simulation mode banner */}
+              {simulationResult && currentView === 'graph' && (
+                <div className="absolute top-0 left-0 right-0 z-20 bg-[#EFF6FF] border-b border-[#BFDBFE] px-4 py-2 flex justify-between items-center">
+                  <span className="font-mono text-[11px] text-[#1D4ED8]">
+                    SIMULATION MODE — Showing hypothetical: {simulationResult.hypothetical_tx.sender_id} → {simulationResult.hypothetical_tx.receiver_id} (${simulationResult.hypothetical_tx.amount.toLocaleString()})
+                  </span>
+                  <button
+                    onClick={() => setSimulationResult(null)}
+                    className="text-[11px] text-[#1D4ED8] hover:underline font-medium"
+                  >
+                    Clear Simulation ×
+                  </button>
+                </div>
+              )}
+
               {currentView === 'graph' && (
                 <Suspense fallback={
                   <div className="flex items-center justify-center h-full w-full text-sm text-[var(--color-text-muted)] font-mono">
@@ -148,6 +170,7 @@ function App() {
                     rings={rings}
                     onNodeClick={handleNodeClick}
                     selectedAccountId={selectedAccountId || undefined}
+                    simulationResult={simulationResult}
                   />
                 </Suspense>
               )}
@@ -164,27 +187,34 @@ function App() {
                 <AccountExplorer
                   accounts={accounts}
                   onAccountClick={handleNodeClick}
-              />
-            )}
+                />
+              )}
 
-            {currentView === 'charts' && (
-              <ChartsView
-                accounts={accounts}
-                rings={rings}
-                transactions={transactions}
-              />
-            )}
+              {currentView === 'charts' && (
+                <ChartsView
+                  accounts={accounts}
+                  rings={rings}
+                  transactions={transactions}
+                />
+              )}
 
-            {selectedAccount && (
-              <AccountDetailPanel
-                account={selectedAccount}
-                onClose={() => setSelectedAccountId(null)}
-                onAccountLinkClick={handleNodeClick}
-              />
-            )}
-          </main>
-        </div>
-      )}
+              {selectedAccount && (
+                <AccountDetailPanel
+                  account={selectedAccount}
+                  onClose={() => setSelectedAccountId(null)}
+                  onAccountLinkClick={handleNodeClick}
+                />
+              )}
+            </main>
+
+            {/* Simulator Panel */}
+            <SimulatorPanel
+              isOpen={simulatorOpen}
+              onClose={() => setSimulatorOpen(false)}
+              onSimulationResult={setSimulationResult}
+            />
+          </div>
+        )}
       </div>
     </ErrorBoundary>
   );

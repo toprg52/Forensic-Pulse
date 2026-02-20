@@ -1,5 +1,5 @@
 import React from 'react';
-import { Share2, Table, Search, AlertCircle, FileText, Activity, BarChart3 } from 'lucide-react';
+import { Share2, Table, Search, AlertCircle, FileText, Activity, BarChart3, Zap } from 'lucide-react';
 import clsx from 'clsx';
 import { motion } from 'motion/react';
 
@@ -13,9 +13,10 @@ interface SidebarProps {
     processingTime: number;
   };
   patterns: { name: string; count: number; }[];
+  onOpenSimulator: () => void;
 }
 
-export function Sidebar({ view, setView, metrics, patterns }: SidebarProps) {
+export function Sidebar({ view, setView, metrics, patterns, onOpenSimulator }: SidebarProps) {
   const totalRings = metrics.rings || 1;
   // Compute critical/high/medium/low from suspicious count heuristic
   const criticalCount = Math.round(metrics.suspicious * 0.15);
@@ -133,6 +134,19 @@ export function Sidebar({ view, setView, metrics, patterns }: SidebarProps) {
             label="Analytics Charts"
           />
         </nav>
+
+        {/* Simulator */}
+        <div className="mt-3 pt-3 border-t border-[var(--color-border-subtle)]">
+          <button
+            onClick={onOpenSimulator}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-200 text-left text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-raised)] hover:text-[var(--color-text-primary)] border-l-2 border-transparent"
+          >
+            <span className="text-[var(--color-text-muted)]">
+              <Zap size={16} />
+            </span>
+            <span className="text-[13px]">What-If Simulator</span>
+          </button>
+        </div>
       </div>
     </aside>
   );
