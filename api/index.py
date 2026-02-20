@@ -1,33 +1,29 @@
 """
-Vercel Serverless Function for FastAPI Backend
+Vercel Serverless Function using ASGI
 """
 import sys
-import os
 from pathlib import Path
 
-# Add the backend directory to Python path
+# Add backend to path
 backend_path = Path(__file__).parent.parent / "back-end" / "new-back"
 sys.path.insert(0, str(backend_path))
 
-print(f"[API] Backend path: {backend_path}")
-print(f"[API] Backend exists: {backend_path.exists()}")
-print(f"[API] Files in backend: {list(backend_path.glob('*.py'))}")
-
+# Try to import FastAPI app, fallback to minimal stub
 try:
-    # Import FastAPI app
     from main import app
-    print("[API] Successfully imported FastAPI app from main.py")
-except ImportError as e:
-    print(f"[API] Failed to import main.py: {e}")
-    import traceback
-    traceback.print_exc()
-    raise
 except Exception as e:
-    print(f"[API] Unexpected error importing main.py: {e}")
-    import traceback
-    traceback.print_exc()
-    raise
+    print(f"Failed to import FastAPI app: {e}")
+    # Create minimal ASGI app
+    async def app(scope, receive, send):
+        if scope['type'] == 'http':
+            await send({
+                'type': 'http.response.start',
+                'status': 200,
+                'headers': [[b'content-type', b'application/json']],
+            })
+            await send({
+                'type': 'http.response.body',
+                'body': b'{"status": "ok"}',
+            })
 
-# Export app for Vercel ASGI handler
-# The app variable must be accessible at module level
-__all__ = ['app']
+

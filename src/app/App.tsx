@@ -9,6 +9,42 @@ import { ChartsView } from './components/ChartsView';
 import type { AnalysisResponse } from './api';
 import { mapApiToAccounts, mapApiToRings, mapApiToTransactions } from './data/mappers';
 
+// Error boundary for graceful error handling
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('App Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
+          <h1>⚠️ Application Error</h1>
+          <p>The app encountered an error. Please refresh the page.</p>
+          <details style={{ whiteSpace: 'pre-wrap', overflow: 'auto', maxHeight: '200px' }}>
+            <summary>Error Details</summary>
+            {this.state.error?.toString()}
+          </details>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 // Lazy load NetworkGraph to isolate cytoscape dependency issues
 const NetworkGraph = React.lazy(() =>
   import('./components/NetworkGraph').then(module => ({ default: module.NetworkGraph }))
@@ -78,55 +114,56 @@ function App() {
   ];
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-[var(--color-bg-canvas)] overflow-hidden font-sans text-[var(--color-text-primary)]">
-      <NavBar
-        isAnalyzed={hasAnalyzed}
-        onReset={handleReset}
-        fileName={fileName}
-        ringCount={summary?.fraud_rings_detected ?? 0}
-        analysisResponse={analysisResponse}
-      />
+    <ErrorBoundary>
+      <div className="h-screen w-screen flex flex-col bg-[var(--color-bg-canvas)] overflow-hidden font-sans text-[var(--color-text-primary)]">
+        <NavBar
+          isAnalyzed={hasAnalyzed}
+          onReset={handleReset}
+          fileName={fileName}
+          ringCount={summary?.fraud_rings_detected ?? 0}
+          analysisResponse={analysisResponse}
+        />
 
-      {!hasAnalyzed ? (
-        <UploadScreen onAnalyze={handleAnalyze} />
-      ) : (
-        <div className="flex-1 flex overflow-hidden">
-          <Sidebar
-            view={currentView}
-            setView={setCurrentView}
-            metrics={sidebarMetrics}
-            patterns={sidebarPatterns}
-          />
+        {!hasAnalyzed ? (
+          <UploadScreen onAnalyze={handleAnalyze} />
+        ) : (
+          <div className="flex-1 flex overflow-hidden">
+            <Sidebar
+              view={currentView}
+              setView={setCurrentView}
+              metrics={sidebarMetrics}
+              patterns={sidebarPatterns}
+            />
 
-          <main className="flex-1 relative bg-[var(--color-bg-canvas)]">
-            {currentView === 'graph' && (
-              <Suspense fallback={
-                <div className="flex items-center justify-center h-full w-full text-sm text-[var(--color-text-muted)] font-mono">
-                  Loading Graph Visualization...
-                </div>
-              }>
-                <NetworkGraph
-                  accounts={accounts}
-                  transactions={transactions}
+            <main className="flex-1 relative bg-[var(--color-bg-canvas)]">
+              {currentView === 'graph' && (
+                <Suspense fallback={
+                  <div className="flex items-center justify-center h-full w-full text-sm text-[var(--color-text-muted)] font-mono">
+                    Loading Graph Visualization...
+                  </div>
+                }>
+                  <NetworkGraph
+                    accounts={accounts}
+                    transactions={transactions}
+                    rings={rings}
+                    onNodeClick={handleNodeClick}
+                    selectedAccountId={selectedAccountId || undefined}
+                  />
+                </Suspense>
+              )}
+
+              {currentView === 'rings' && (
+                <RingsTable
                   rings={rings}
-                  onNodeClick={handleNodeClick}
-                  selectedAccountId={selectedAccountId || undefined}
+                  accounts={accounts}
+                  onRingClick={handleRingClick}
                 />
-              </Suspense>
-            )}
+              )}
 
-            {currentView === 'rings' && (
-              <RingsTable
-                rings={rings}
-                accounts={accounts}
-                onRingClick={handleRingClick}
-              />
-            )}
-
-            {currentView === 'explorer' && (
-              <AccountExplorer
-                accounts={accounts}
-                onAccountClick={handleNodeClick}
+              {currentView === 'explorer' && (
+                <AccountExplorer
+                  accounts={accounts}
+                  onAccountClick={handleNodeClick}
               />
             )}
 
@@ -148,7 +185,8 @@ function App() {
           </main>
         </div>
       )}
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 }
 
