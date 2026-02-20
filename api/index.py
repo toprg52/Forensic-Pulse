@@ -28,5 +28,6 @@ except Exception as e:
     traceback.print_exc()
     raise
 
-# Expose as ASGI application for Vercel
-# Vercel will automatically handle the ASGI adapter
+# Export app for Vercel ASGI handler
+# The app variable must be accessible at module level
+__all__ = ['app']
