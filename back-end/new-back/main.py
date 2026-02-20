@@ -122,7 +122,7 @@ def api_health():
 # Main Analysis Endpoint
 # ─────────────────────────────────────────────────────────────
 
-@app.post("/analyze")
+@app.post("/api/analyze")
 async def analyze(file: UploadFile = File(...)):
     """
     Accept a CSV file and return full forensics analysis.
@@ -193,7 +193,7 @@ async def analyze(file: UploadFile = File(...)):
 # Sample / Demo Data Generator
 # ─────────────────────────────────────────────────────────────
 
-@app.get("/sample-csv")
+@app.get("/api/sample-csv")
 def get_sample_csv():
     """Return a small sample CSV payload for UI demo purposes."""
     import random
@@ -265,7 +265,7 @@ def get_sample_csv():
 # What-If Transaction Simulator
 # ─────────────────────────────────────────────────────────────
 
-@app.post("/simulate")
+@app.post("/api/simulate")
 async def simulate_endpoint(request: SimulationRequest):
     """Run a what-if simulation for a hypothetical transaction."""
     if app.state.last_analysis_result is None:
@@ -290,7 +290,7 @@ async def simulate_endpoint(request: SimulationRequest):
     return JSONResponse(content=result)
 
 
-@app.get("/accounts")
+@app.get("/api/accounts")
 async def get_account_list():
     """Return all known account IDs (for frontend autocomplete)."""
     if not app.state.last_all_nodes:
