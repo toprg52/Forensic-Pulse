@@ -4,12 +4,6 @@
   "devCommand": "npm run dev",
   "installCommand": "npm install",
   "framework": "vite",
-  "functions": {
-    "api/index.py": {
-      "runtime": "python@3.11",
-      "maxDuration": 300
-    }
-  },
   "routes": [
     {
       "src": "/api/(.*)",
