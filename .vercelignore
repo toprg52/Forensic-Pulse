@@ -1,0 +1,12 @@
+.git
+.gitignore
+node_modules
+src
+back-end
+supabase
+utils
+guidelines
+ATTRIBUTIONS.md
+README.md
+postcss.config.mjs
+vite.config.ts
