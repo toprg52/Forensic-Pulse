@@ -140,10 +140,12 @@ async def analyze(file: UploadFile = File(...)):
 
     try:
         result = run_full_analysis(df)
+        return JSONResponse(content=result)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {e}")
-
-    return JSONResponse(content=result)
+        import traceback
+        error_msg = f"Analysis failed: {str(e)}\n{traceback.format_exc()}"
+        print(f"ERROR: {error_msg}")  # Log to Vercel console
+        raise HTTPException(status_code=500, detail=error_msg)
 
 
 # ─────────────────────────────────────────────────────────────
